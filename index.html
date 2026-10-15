@@ -1,292 +1,267 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>隱沒帶構造與板塊動態交互作用視覺化</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif; }
-        .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .subduction-layer { transition: all 0.3s ease; cursor: pointer; }
-        .subduction-layer:hover { filter: brightness(1.2); transform: scale(1.01); }
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 0.3; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.05); }
-        }
-        .magma-pulse { animation: pulse-slow 3s infinite ease-in-out; }
-    </style>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-cyan-500 selection:text-slate-950">
+<!-- 頂部導覽 -->
+<header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
+            <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                Subduction Evolution Animation
+            </h1>
+        </div>
+        <div class="text-sm text-slate-400 font-medium">
+            隱沒帶構造的動態演化步驟
+        </div>
+    </div>
+</header>
 
-    <!-- 頂部導覽列 -->
-    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
-                <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                    Subduction Zone Tectonics Visualizer
-                </h1>
+<main class="max-w-7xl mx-auto px-4 py-8 space-y-8 flex-grow w-full">
+
+    <!-- 標題與說明 -->
+    <section class="text-center space-y-3 max-w-2xl mx-auto">
+        <h2 class="text-3xl font-extrabold tracking-tight">隱沒帶構造生成步驟動畫</h2>
+        <p class="text-slate-400 text-sm">
+            透過逐步播放或自動動畫，觀察海洋板塊下插如何引發連鎖地質構造：海溝 $\rightarrow$ 增生楔 $\rightarrow$ 弧前盆地 $\rightarrow$ 火山島弧 $\rightarrow$ 弧後盆地。
+        </p>
+    </section>
+
+    <!-- 動畫控制面板與檢視區 -->
+    <section class="glass-panel rounded-2xl p-6 shadow-2xl relative overflow-hidden space-y-6">
+        
+        <!-- 控制列 (播放/暫停/上一步/下一步/重置) -->
+        <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+            <div class="flex items-center space-x-2">
+                <button onclick="prevStep()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold text-slate-200 transition">上一步</button>
+                <button id="play-btn" onclick="togglePlay()" class="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-xs font-bold text-white transition shadow-lg shadow-cyan-500/20">自動播放</button>
+                <button onclick="nextStep()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold text-slate-200 transition">下一步</button>
+                <button onclick="resetAnimation()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold text-slate-400 transition">重置</button>
             </div>
-            <div class="text-sm text-slate-400 font-medium">
-                板塊隱沒帶系統與構造交互作用
+
+            <!-- 進度指示 -->
+            <div class="flex items-center space-x-2">
+                <span id="step-indicator" class="text-xs font-mono text-cyan-400 bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-800">階段 1 / 5</span>
             </div>
         </div>
-    </header>
 
-    <main class="max-w-7xl mx-auto px-4 py-8 space-y-12">
+        <!-- SVG 動畫畫布 -->
+        <div class="w-full overflow-x-auto bg-slate-900/40 rounded-xl p-2 border border-slate-800/60">
+            <svg viewBox="0 0 1000 450" class="w-full min-w-[750px] h-auto select-none">
+                <!-- 背景 -->
+                <rect width="1000" height="450" fill="#070a12" rx="8"/>
 
-        <!-- 導言區 -->
-        <section class="text-center space-y-4 max-w-3xl mx-auto">
-            <h2 class="text-3xl lg:text-4xl font-extrabold tracking-tight">探索地球最強大的構造引擎</h2>
-            <p class="text-slate-400 text-lg">
-                當海洋板塊向下俯衝進入地函，上盤板塊與隱沒系統共同塑造了從海溝、增生楔、弧前盆地、火山島弧到弧後盆地的壯麗地質剖面。點擊下方互動圖解或結構卡片深入了解。
-            </p>
-        </section>
+                <!-- 海洋水體 -->
+                <path d="M0,80 Q250,90 500,80 Q750,70 1000,80 L1000,120 L0,120 Z" fill="#0ea5e9" fill-opacity="0.15"/>
 
-        <!-- 互動式動態剖面圖解 (SVG Canvas) -->
-        <section class="glass-panel rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-cyan-300 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-                    隱沒帶系統剖面示意圖 (點擊區塊切換詳情)
-                </h3>
-                <span class="text-xs bg-cyan-500/10 text-cyan-400 px-3 py-1 rounded-full border border-cyan-500/20">互動模型</span>
-            </div>
-
-            <!-- SVG 剖面圖 -->
-            <div class="w-full overflow-x-auto">
-                <svg viewBox="0 0 1000 450" class="w-full min-w-[700px] h-auto select-none">
-                    <!-- 背景層 -->
-                    <rect width="1000" height="450" fill="#090d16" rx="12"/>
-
-                    <!-- 海洋與水體 -->
-                    <path d="M0,80 Q250,90 500,80 Q750,70 1000,80 L1000,120 L0,120 Z" fill="#0ea5e9" fill-opacity="0.2"/>
-
-                    <!-- 下插海洋板塊 (Subducting Slab) -->
+                <!-- 1. 下插海洋板塊 (隨著步驟往下移動) -->
+                <g id="svg-slab" class="anim-element" transform="translate(0, 0)">
                     <g transform="rotate(35 300 150)">
                         <rect x="50" y="100" width="800" height="50" fill="#334155" rx="4"/>
                         <rect x="50" y="150" width="800" height="150" fill="#1e293b" rx="4"/>
                     </g>
+                </g>
 
-                    <!-- 上盤板塊 (Overriding Plate) -->
-                    <path d="M 400,120 Q 600,120 1000,120 L 1000,450 L 350,450 Z" fill="#1e293b" fill-opacity="0.8"/>
+                <!-- 上盤板塊 (Overriding Plate) -->
+                <path d="M 400,120 Q 600,120 1000,120 L 1000,450 L 350,450 Z" fill="#1e293b" fill-opacity="0.85"/>
 
-                    <!-- 互動區域：海溝/海槽 (Trench) -->
-                    <g class="subduction-layer" onclick="selectUnit('trench')">
-                        <polygon points="330,120 370,120 350,180" fill="#38bdf8" fill-opacity="0.6"/>
-                        <text x="330" y="110" fill="#38bdf8" font-size="12" font-weight="bold">1. 海溝 / 海槽</text>
-                    </g>
+                <!-- 構造 A：海溝 / 海槽 (Step >= 1) -->
+                <g id="svg-trench" class="anim-element opacity-20 scale-95" style="transform-origin: 350px 150px;">
+                    <polygon points="330,120 370,120 350,180" fill="#38bdf8" fill-opacity="0.7"/>
+                    <text x="315" y="105" fill="#38bdf8" font-size="11" font-weight="bold">1. 海溝 / 海槽</text>
+                </g>
 
-                    <!-- 互動區域：增生楔 (Accretionary Wedge) -->
-                    <g class="subduction-layer" onclick="selectUnit('wedge')">
-                        <path d="M 370,120 Q 420,130 460,150 L 350,180 Z" fill="#f59e0b" fill-opacity="0.7"/>
-                        <text x="390" y="105" fill="#f59e0b" font-size="12" font-weight="bold">2. 增生楔</text>
-                    </g>
+                <!-- 構造 B：增生楔 (Step >= 2) -->
+                <g id="svg-wedge" class="anim-element opacity-0 scale-95" style="transform-origin: 410px 140px;">
+                    <path d="M 370,120 Q 420,130 460,150 L 350,180 Z" fill="#f59e0b" fill-opacity="0.8"/>
+                    <text x="390" y="95" fill="#f59e0b" font-size="11" font-weight="bold">2. 增生楔 (推雪機)</text>
+                </g>
 
-                    <!-- 互動區域：弧前盆地 (Fore-arc Basin) -->
-                    <g class="subduction-layer" onclick="selectUnit('forearc')">
-                        <path d="M 460,150 Q 520,130 580,150 L 460,180 Z" fill="#10b981" fill-opacity="0.7"/>
-                        <text x="490" y="115" fill="#10b981" font-size="12" font-weight="bold">3. 弧前盆地</text>
-                    </g>
+                <!-- 構造 C：弧前盆地 (Step >= 3) -->
+                <g id="svg-forearc" class="anim-element opacity-0 scale-95" style="transform-origin: 520px 140px;">
+                    <path d="M 460,150 Q 520,130 580,150 L 460,180 Z" fill="#10b981" fill-opacity="0.8"/>
+                    <text x="480" y="105" fill="#10b981" font-size="11" font-weight="bold">3. 弧前盆地</text>
+                </g>
 
-                    <!-- 互動區域：火山島弧 (Volcanic Arc) -->
-                    <g class="subduction-layer" onclick="selectUnit('arc')">
-                        <polygon points="620,120 650,70 680,120" fill="#ef4444"/>
-                        <circle cx="650" cy="85" r="15" fill="#f97316" class="magma-pulse"/>
-                        <text x="610" y="55" fill="#ef4444" font-size="12" font-weight="bold">4. 火山島弧</text>
-                    </g>
+                <!-- 構造 D：火山島弧 (Step >= 4) -->
+                <g id="svg-arc" class="anim-element opacity-0 scale-95" style="transform-origin: 650px 100px;">
+                    <polygon points="620,120 650,65 680,120" fill="#ef4444"/>
+                    <circle id="magma-ball" cx="650" cy="85" r="14" fill="#f97316"/>
+                    <text x="610" y="45" fill="#ef4444" font-size="11" font-weight="bold">4. 火山島弧 (水化熔融)</text>
+                    <!-- 脫水流體箭頭 -->
+                    <path d="M 450,230 Q 550,180 640,110" stroke="#38bdf8" stroke-dasharray="3,3" stroke-width="2" fill="none"/>
+                </g>
 
-                    <!-- 互動區域：弧後盆地 (Back-arc Basin) -->
-                    <g class="subduction-layer" onclick="selectUnit('backarc')">
-                        <rect x="730" y="110" width="180" height="30" fill="#8b5cf6" fill-opacity="0.7" rx="4"/>
-                        <text x="740" y="95" fill="#a78bfa" font-size="12" font-weight="bold">5. 弧後盆地 / 張裂</text>
-                        <!-- 張裂箭頭 -->
-                        <path d="M 770,125 L 750,125 M 750,125 L 755,120 M 750,125 L 755,130" stroke="#fff" stroke-width="2"/>
-                        <path d="M 870,125 L 890,125 M 890,125 L 885,120 M 890,125 L 885,130" stroke="#fff" stroke-width="2"/>
-                    </g>
+                <!-- 構造 E：弧後盆地 / 張裂 (Step >= 5) -->
+                <g id="svg-backarc" class="anim-element opacity-0 scale-95" style="transform-origin: 800px 120px;">
+                    <rect x="730" y="110" width="180" height="30" fill="#8b5cf6" fill-opacity="0.8" rx="4"/>
+                    <text x="745" y="90" fill="#a78bfa" font-size="11" font-weight="bold">5. 弧後盆地 (板塊後撤張裂)</text>
+                    <!-- 張裂雙向箭頭 -->
+                    <path d="M 770,125 L 750,125 M 750,125 L 755,120 M 750,125 L 755,130" stroke="#fff" stroke-width="2"/>
+                    <path d="M 870,125 L 890,125 M 890,125 L 885,120 M 890,125 L 885,130" stroke="#fff" stroke-width="2"/>
+                </g>
+            </svg>
+        </div>
 
-                    <!-- 深度參考線與水化熔融標示 -->
-                    <line x1="100" y1="280" x2="900" y2="280" stroke="#64748b" stroke-dasharray="4,4" stroke-width="1"/>
-                    <text x="850" y="275" fill="#64748b" font-size="10">約 100km 深度 (水化熔融點)</text>
-                </svg>
+        <!-- 當前階段詳細解說卡片 -->
+        <div id="step-description-box" class="bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+                <h3 id="step-title" class="text-xl font-bold text-cyan-400">階段 1：海溝與海槽的形成</h3>
+                <span id="step-badge" class="text-xs bg-cyan-500/10 text-cyan-400 px-3 py-1 rounded-full border border-cyan-500/20">構造初啟</span>
             </div>
-            <p class="text-center text-xs text-slate-500 mt-3">提示：點擊上方圖解中的各個構造區塊，下方會即時顯示詳細的形成機制與物理特徵。</p>
-        </section>
+            <p id="step-desc" class="text-slate-300 text-sm leading-relaxed">
+                當密度較大的海洋板塊與上盤板塊相遇，因重力向下彎曲並俯衝進入地函，在地表拉開一條狹長、深邃的凹地——海溝。
+            </p>
+        </div>
 
-        <!-- 結構卡片與動態詳情區 -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- 左側：構造清單選單 -->
-            <div class="lg:col-span-1 space-y-3">
-                <h3 class="text-lg font-bold text-slate-200 mb-4">構造單元列表</h3>
-                
-                <button onclick="selectUnit('trench')" id="btn-trench" class="w-full text-left p-4 rounded-xl transition-all border border-slate-800 bg-slate-900 hover:border-cyan-500/50 group">
-                    <div class="flex justify-between items-center">
-                        <span class="font-semibold text-cyan-400 group-hover:text-cyan-300">1. 海溝 / 海槽</span>
-                        <span class="text-xs text-slate-500">Trench / Trough</span>
-                    </div>
-                    <p class="text-xs text-slate-400 mt-1">板塊向下俯衝的地表深邃凹地</p>
-                </button>
+    </section>
 
-                <button onclick="selectUnit('wedge')" id="btn-wedge" class="w-full text-left p-4 rounded-xl transition-all border border-slate-800 bg-slate-900 hover:border-amber-500/50 group">
-                    <div class="flex justify-between items-center">
-                        <span class="font-semibold text-amber-400 group-hover:text-amber-300">2. 增生楔</span>
-                        <span class="text-xs text-slate-500">Accretionary Wedge</span>
-                    </div>
-                    <p class="text-xs text-slate-400 mt-1">推雪機效應刮除的沉積物堆積</p>
-                </button>
+</main>
 
-                <button onclick="selectUnit('forearc')" id="btn-forearc" class="w-full text-left p-4 rounded-xl transition-all border border-slate-800 bg-slate-900 hover:border-emerald-500/50 group">
-                    <div class="flex justify-between items-center">
-                        <span class="font-semibold text-emerald-400 group-hover:text-emerald-300">3. 弧前盆地</span>
-                        <span class="text-xs text-slate-500">Fore-arc Basin</span>
-                    </div>
-                    <p class="text-xs text-slate-400 mt-1">夾在增生楔與火山弧之間的沉積空間</p>
-                </button>
+<!-- 頁尾 -->
+<footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+    <p>Subduction Zone Tectonic Step-by-Step Interactive Animation &bull; Built with Tailwind CSS</p>
+</footer>
 
-                <button onclick="selectUnit('arc')" id="btn-arc" class="w-full text-left p-4 rounded-xl transition-all border border-slate-800 bg-slate-900 hover:border-rose-500/50 group">
-                    <div class="flex justify-between items-center">
-                        <span class="font-semibold text-rose-400 group-hover:text-rose-300">4. 火山島弧</span>
-                        <span class="text-xs text-slate-500">Volcanic Island Arc</span>
-                    </div>
-                    <p class="text-xs text-slate-400 mt-1">水化熔融引發的地表火山鏈</p>
-                </button>
+<!-- 動畫控制腳本 -->
+<script>
+    let currentStep = 1;
+    const totalSteps = 5;
+    let isPlaying = false;
+    let playInterval = null;
 
-                <button onclick="selectUnit('backarc')" id="btn-backarc" class="w-full text-left p-4 rounded-xl transition-all border border-slate-800 bg-slate-900 hover:border-purple-500/50 group">
-                    <div class="flex justify-between items-center">
-                        <span class="font-semibold text-purple-400 group-hover:text-purple-300">5. 弧後盆地</span>
-                        <span class="text-xs text-slate-500">Back-arc Basin</span>
-                    </div>
-                    <p class="text-xs text-slate-400 mt-1">伴隨板塊後撤與張裂擴張的盆地</p>
-                </button>
-            </div>
-
-            <!-- 右側：詳細內容顯示面板 -->
-            <div class="lg:col-span-2 glass-panel rounded-2xl p-8 flex flex-col justify-between">
-                <div id="content-display" class="space-y-6">
-                    <!-- 動態載入內容 -->
-                </div>
-
-                <div class="mt-8 pt-6 border-t border-slate-800 flex justify-between items-center text-xs text-slate-500">
-                    <span>板塊動態力學平衡系統</span>
-                    <span id="active-tag" class="text-cyan-400 font-mono">Status: Active</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- 彼此動態交互作用區段 -->
-        <section class="glass-panel rounded-2xl p-8 space-y-6">
-            <h3 class="text-xl font-bold text-cyan-300 flex items-center gap-2">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                彼此的動態交互作用與演化
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-slate-900/80 p-5 rounded-xl border border-slate-800">
-                    <h4 class="font-semibold text-cyan-400 mb-2">1. 力學平衡 (Mechanical Balance)</h4>
-                    <p class="text-sm text-slate-400">增生楔的成長受下插板塊摩擦力與上盤前緣強度控制。沉積物過多會使海溝變淺；反之若貧乏則形成蝕型隱沒帶（Erosive Subduction）。</p>
-                </div>
-                <div class="bg-slate-900/80 p-5 rounded-xl border border-slate-800">
-                    <h4 class="font-semibold text-emerald-400 mb-2">2. 熱力與構造對立 (Thermal Contrast)</h4>
-                    <p class="text-sm text-slate-400">隱沒帶呈現顯著的「高熱流（島弧與弧後）對比低熱流（海溝與弧前）」分佈，冷凝的下插板塊在下方吸熱，主導了地溫梯度的劇烈變化。</p>
-                </div>
-                <div class="bg-slate-900/80 p-5 rounded-xl border border-slate-800">
-                    <h4 class="font-semibold text-rose-400 mb-2">3. 造山運動演化 (Orogenic Evolution)</h4>
-                    <p class="text-sm text-slate-400">當隱沒帶最終演變成板塊碰撞帶（如台灣島），原先的弧前盆地與增生楔會遭到擠壓隆起，形成山脈核心與前陸盆地系統。</p>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- 頁尾 -->
-    <footer class="border-t border-slate-800 mt-20 py-8 text-center text-sm text-slate-500">
-        <p>Subduction Zone Tectonic Interactive Model &bull; Hosted on GitHub Pages</p>
-    </footer>
-
-    <!-- JavaScript 互動邏輯 -->
-    <script>
-        const data = {
-            trench: {
-                title: "海溝 (Trench) 與 海槽 (Trough)",
-                color: "text-cyan-400",
-                badge: "Trench / Trough",
-                desc: "當密度較大的海洋板塊向下彎曲、俯衝進入地函時，在地表形成的狹長、深邃凹地。這是全球地形的最低點（例如馬里亞納海溝）。",
-                features: [
-                    "海溝：深邃狹長，多位於開闊洋盆邊界。",
-                    "海槽：通常較淺、沉積物較多，可能出現在發育初期、斜向碰撞或正處於張裂擴張階段（如沖繩海槽）。"
-                ]
-            },
-            wedge: {
-                title: "增生楔 (Accretionary Wedge / 增生稜體)",
-                color: "text-amber-400",
-                badge: "Accretionary Wedge",
-                desc: "當海洋板塊向下滑動時，表面攜帶的深海沉積物與洋殼碎屑被上盤板塊前緣像「推雪機」一樣刮除並剝落下來。",
-                features: [
-                    "構造特徵：受到強烈水平擠壓，形成一系列向陸側傾斜的疊瓦狀逆衝斷層（Thrust Faults）與褶皺。",
-                    "代表區域：台灣南部的恆春半島與海底增生楔構造。"
-                ]
-            },
-            forearc: {
-                title: "弧前盆地 (Fore-arc Basin)",
-                color: "text-emerald-400",
-                badge: "Fore-arc Basin",
-                desc: "位於「增生楔（或外弧高）」與「火山島弧」之間的沉積空間，承受來自火山弧風化剝蝕與外海的大量碎屑物。",
-                features: [
-                    "沉積厚度：累積了厚重的海相地層。",
-                    "熱流特徵：熱流值相對較低，因為冷凝的下插板塊在下方持續吸熱。"
-                ]
-            },
-            arc: {
-                title: "火山島弧 / 島弧 (Volcanic Island Arc)",
-                color: "text-rose-400",
-                badge: "Volcanic Island Arc",
-                desc: "當下插板塊下沉至約 100 公里深處時，高溫高壓促使含水礦物脫水，水份溢出並滲入上盤的地函楔（Mantle Wedge），大幅降低地函岩石熔點。",
-                features: [
-                    "形成機制：水化熔融 (Flux Melting) 產生的岩漿上升並噴發在地表。",
-                    "分類：建構在海洋殼上稱為島弧（如馬里亞納群島）；建構在大陸邊緣則為大陸火山弧（如安地斯山脈）。"
-                ]
-            },
-            backarc: {
-                title: "弧後盆地 (Back-arc Basin)",
-                color: "text-purple-400",
-                badge: "Back-arc Basin",
-                desc: "位於火山島弧背向海溝的一側。多數大型弧後盆地不僅是沉積盆地，更伴隨著活躍的張裂與海床擴張。",
-                features: [
-                    "板塊後撤 (Slab Rollback)：下插板塊垂直向下沉降速度大於水平前進速度，拉扯上盤板塊使其張裂。",
-                    "地函對流：引發地函上湧流將上盤板塊撐開，形成新的海洋地殼（如馬里亞納海槽）。"
-                ]
-            }
-        };
-
-        function selectUnit(key) {
-            const item = data[key];
-            const container = document.getElementById('content-display');
-            
-            container.innerHTML = `
-                <div>
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-2xl font-bold ${item.color}">${item.title}</h3>
-                        <span class="text-xs px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">${item.badge}</span>
-                    </div>
-                    <p class="text-slate-300 text-base leading-relaxed mb-6">${item.desc}</p>
-                    <div class="space-y-2">
-                        <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">關鍵構造特徵：</h4>
-                        ${item.features.map(f => `<div class="flex items-start gap-2 text-sm text-slate-300 bg-slate-900/60 p-3 rounded-lg border border-slate-800/80"><span class="text-cyan-400 font-bold">&#8226;</span> <span>${f}</span></div>`).join('')}
-                    </div>
-                </div>
-            `;
-
-            // 更新按鈕樣式狀態
-            document.querySelectorAll('aside button, .lg\\:col-span-1 button').forEach(btn => {
-                btn.classList.remove('border-cyan-500', 'border-amber-500', 'border-emerald-500', 'border-rose-500', 'border-purple-500', 'bg-slate-800');
-            });
+    const stepsData = {
+        1: {
+            title: "階段 1：海溝與海槽的形成 (Trench / Trough)",
+            badge: "構造初啟",
+            desc: "當密度較大的海洋板塊向下彎曲、俯衝進入地函時，在地表形成的狹長、深邃凹地（海溝）。若受大量陸源沉積物填滿或處於初期張裂，則形成海槽。",
+            opacityTrench: "opacity-100 scale-100",
+            opacityWedge: "opacity-0 scale-95",
+            opacityForearc: "opacity-0 scale-95",
+            opacityArc: "opacity-0 scale-95",
+            opacityBackarc: "opacity-0 scale-95",
+            slabTransform: "translate(0, 0)"
+        },
+        2: {
+            title: "階段 2：增生楔的堆積 (Accretionary Wedge)",
+            badge: "推雪機效應",
+            desc: "隨著海洋板塊持續向下滑動，其表面攜帶的深海沉積物與洋殼碎屑被上盤板塊前緣像「推雪機」一樣刮除，堆積並形成向陸側傾斜的逆衝斷層與褶皺夾層。",
+            opacityTrench: "opacity-100 scale-100",
+            opacityWedge: "opacity-100 scale-100",
+            opacityForearc: "opacity-0 scale-95",
+            opacityArc: "opacity-0 scale-95",
+            opacityBackarc: "opacity-0 scale-95",
+            slabTransform: "translate(-10px, 5px)"
+        },
+        3: {
+            title: "階段 3：弧前盆地的發育 (Fore-arc Basin)",
+            badge: "沉積空間成形",
+            desc: "增生楔隆起形成天然障礙，阻擋外海沉積物；同時火山弧風化剝蝕提供大量碎屑。兩者夾陷出沉積空間，累積厚重的海相地層，形成低熱流的弧前盆地。",
+            opacityTrench: "opacity-100 scale-100",
+            opacityWedge: "opacity-100 scale-100",
+            opacityForearc: "opacity-100 scale-100",
+            opacityArc: "opacity-0 scale-95",
+            opacityBackarc: "opacity-0 scale-95",
+            slabTransform: "translate(-20px, 10px)"
+        },
+        4: {
+            title: "階段 4：火山島弧的爆發 (Volcanic Island Arc)",
+            badge: "水化熔融 (Flux Melting)",
+            desc: "當下插板塊下沉至約 100 公里深處時高溫脫水，水份溢出並滲入上盤地函楔，大幅降低熔點形成岩漿，噴發在地表形成與海溝平行的火山島弧鏈。",
+            opacityTrench: "opacity-100 scale-100",
+            opacityWedge: "opacity-100 scale-100",
+            opacityForearc: "opacity-100 scale-100",
+            opacityArc: "opacity-100 scale-100",
+            opacityBackarc: "opacity-0 scale-95",
+            slabTransform: "translate(-30px, 15px)"
+        },
+        5: {
+            title: "階段 5：弧後盆地的張裂擴張 (Back-arc Basin)",
+            badge: "板塊後撤與張裂",
+            desc: "伴隨板塊後撤（Slab Rollback）與地函對流上湧，火山島弧後方（內陸側）遭受強力拉扯張裂，甚至形成新的海洋地殼與擴張盆地，完成完整的隱沒系統。",
+            opacityTrench: "opacity-100 scale-100",
+            opacityWedge: "opacity-100 scale-100",
+            opacityForearc: "opacity-100 scale-100",
+            opacityArc: "opacity-100 scale-100",
+            opacityBackarc: "opacity-100 scale-100",
+            slabTransform: "translate(-45px, 22px)"
         }
+    };
 
-        // 預設載入第一個
-        selectUnit('trench');
-    </script>
-</body>
-</html>
+    function updateView() {
+        const data = stepsData[currentStep];
+
+        // 更新文字內容
+        document.getElementById('step-indicator').innerText = `階段 ${currentStep} / ${totalSteps}`;
+        document.getElementById('step-title').innerText = data.title;
+        document.getElementById('step-badge').innerText = data.badge;
+        document.getElementById('step-desc').innerText = data.desc;
+
+        // 更新 SVG 元素狀態
+        document.getElementById('svg-trench').className.baseVal = `anim-element ${data.opacityTrench}`;
+        document.getElementById('svg-wedge').className.baseVal = `anim-element ${data.opacityWedge}`;
+        document.getElementById('svg-forearc').className.baseVal = `anim-element ${data.opacityForearc}`;
+        document.getElementById('svg-arc').className.baseVal = `anim-element ${data.opacityArc}`;
+        document.getElementById('svg-backarc').className.baseVal = `anim-element ${data.opacityBackarc}`;
+
+        document.getElementById('svg-slab').setAttribute('transform', data.slabTransform);
+
+        // 火山島弧階段啟動動態脈動
+        const magma = document.getElementById('magma-ball');
+        if (currentStep >= 4) {
+            magma.classList.add('magma-active');
+        } else {
+            magma.classList.remove('magma-active');
+        }
+    }
+
+    function nextStep() {
+        currentStep++;
+        if (currentStep > totalSteps) {
+            currentStep = 1; // 循環播放
+        }
+        updateView();
+    }
+
+    function prevStep() {
+        currentStep--;
+        if (currentStep < 1) {
+            currentStep = totalSteps;
+        }
+        updateView();
+    }
+
+    function resetAnimation() {
+        stopPlay();
+        currentStep = 1;
+        updateView();
+    }
+
+    function togglePlay() {
+        if (isPlaying) {
+            stopPlay();
+        } else {
+            startPlay();
+        }
+    }
+
+    function startPlay() {
+        isPlaying = true;
+        document.getElementById('play-btn').innerText = "暫停播放";
+        document.getElementById('play-btn').className = "px-5 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-xs font-bold text-white transition shadow-lg shadow-amber-500/20";
+        playInterval = setInterval(() => {
+            if (currentStep >= totalSteps) {
+                currentStep = 1;
+            } else {
+                currentStep++;
+            }
+            updateView();
+        }, 3000); // 每 3 秒切換一個步驟
+    }
+
+    function stopPlay() {
+        isPlaying = false;
+        clearInterval(playInterval);
+        document.getElementById('play-btn').innerText = "自動播放";
+        document.getElementById('play-btn').className = "px-5 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-xs font-bold text-white transition shadow-lg shadow-cyan-500/20";
+    }
+
+    // 初始化
+    updateView();
+</script>
